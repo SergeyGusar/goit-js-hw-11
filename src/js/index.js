@@ -1,114 +1,69 @@
-import axios from 'axios';
+import { getPhotos } from './pixabay-api';
 import Notiflix from 'notiflix';
-import SimpleLightbox from 'simplelightbox';
-import 'simplelightbox/dist/simple-lightbox.min.css';
-import { createMarkup } from './gallery';
+import { formEl, listEl, loadMoreBtnEl } from './refs';
+import { createMarkup } from './create-markup'
 
-
-const form = document.querySelector('.search-form');
-const gallery = document.querySelector('.gallery');
-const loadMore = document.querySelector('.load-more');
 let page = 1;
-let currentSum = 0;
-  
+let querry = null;
+let perPage;
 
-const lightbox = new SimpleLightbox('.gallery a', {
-  captionsData: 'alt',
-  captionDelay: 250,
-  captionPosition: 'bottom',
-});
+formEl.addEventListener('submit', onSubmit);
+loadMoreBtnEl.addEventListener('click', onLoadMoreBtnClick);
 
-
-
-loadMore.addEventListener('click', onLoadMore);
-form.addEventListener('submit', onValueSubmit);
-
-
-
-function onValueSubmit(event) {
+async function onSubmit(event) {
   event.preventDefault();
-  gallery.innerHTML = '';
-  localStorage.clear();
-  
+  loadMoreBtnEl.classList.add('is-hidden');
+  page = 1;
+  querry = event.target.elements.searchQuery.value;
 
-
-  const enteredValue = event.currentTarget[0].value.trim();
-  if (enteredValue === '') {
-    return Notiflix.Notify.failure('All fields must be filled!');
+  if(querry === "") {
+    return;
   }
-  localStorage.setItem('key', enteredValue);
-  render();
-  form.reset();
-}
 
-async function getGallery(page = 1) {
-  const BASE_URL = 'https://pixabay.com/api/';
-  const API_KEY = '41108429-d1297b363185a3a0442dc8f79';
-  const q = localStorage.getItem('key');
-  const image_type = 'photo';
-  const orientation = 'horizontal';
-  const safesearch = 'true';
-  const per_page = 40;
- 
-  
-  const queryParams = new URLSearchParams({
-    key: API_KEY,
-    q,
-    image_type,
-    page,
-    per_page,
-    orientation,
-    safesearch,
-  });
   try {
-    const res = await axios.get(`${BASE_URL}?${queryParams}`);
-    return await res.data;
-  } catch (error) {
-    throw new Error(error);
-  }
-}
+    const {
+       data: { totalHits, hits }, config: { params: { per_page } }
+    } = await getPhotos(querry, page);
 
-
-async function render() {
-  try {
-    const data = await getGallery(page);
-    
-    
-    if (!data.hits.length > 0) {
-      return Notiflix.Notify.failure(
+    perPage = per_page;
+    if (hits.length === 0) {
+      listEl.innerHTML = "";
+      return Notiflix.Notify.warning(
         'Sorry, there are no images matching your search query. Please try again.'
       );
     }
-    
-    gallery.insertAdjacentHTML('beforeend', createMarkup(data.hits));
-    //
-    check(data.hits.length, data.totalHits);
-    lightbox.refresh();
+
+    listEl.innerHTML = createMarkup(hits);
+
+    Notiflix.Notify.success(`Hooray! We found ${totalHits} images.`);
+
+    if (totalHits > 40) {
+      loadMoreBtnEl.classList.remove('is-hidden');
+    }
   } catch (error) {
-    console.log('error!', error);
-  }
+    console.log(error.message);
+    Notiflix.Notify.failure('Oops! Sorry, something is wrong!');
+  } finally { event.target.reset() }
 }
 
+async function onLoadMoreBtnClick() {
+  page += 1;
 
-async function onLoadMore() {
   try {
-    page += 1;
-    const data = await render();
+    const {
+      data: { totalHits, hits },
+    } = await getPhotos(querry, page);
+
+    listEl.insertAdjacentHTML('beforeend', createMarkup(hits));
+
+    const totalPage = Math.ceil(totalHits / perPage);
+
+    if(totalPage === page){
+      loadMoreBtnEl.classList.add('is-hidden');
+      Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
+    }
   } catch (error) {
-    console.log('error!', error);
+    console.log(error.message);
+    Notiflix.Notify.failure('Oops! Sorry, something is wrong!');
   }
-  lightbox.refresh();
-}
-
-
-function check(current, total) {
-  currentSum += current;
-  if (currentSum >= total) {
-    loadMore.classList.add('visibility-hidden');
-    return Notiflix.Notify.info(
-      "We're sorry, but you've reached the end of search results."
-    );
-  }
-  Notiflix.Notify.success(`Hooray! We found ${currentSum} of ${total} images`);
-  loadMore.classList.remove('visibility-hidden');
 }
