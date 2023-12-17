@@ -17,7 +17,7 @@ async function onSubmit(event) {
   querry = event.target.elements.searchQuery.value.trim();
 
   if(querry === "") {
-    return  warning();
+    return alert();
   }
 
   try {
