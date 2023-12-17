@@ -14,10 +14,10 @@ async function onSubmit(event) {
   event.preventDefault();
   loadMoreBtnEl.classList.add('is-hidden');
   page = 1;
-  querry = event.target.elements.searchQuery.value;
+  querry = event.target.elements.searchQuery.value.trim();
 
   if(querry === "") {
-    return;
+    return  warning();
   }
 
   try {
